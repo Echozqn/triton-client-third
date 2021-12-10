@@ -26,7 +26,9 @@
 
 #include <getopt.h>
 #include <signal.h>
+
 #include <algorithm>
+
 #include "concurrency_manager.h"
 #include "custom_load_manager.h"
 #include "inference_profiler.h"
@@ -641,546 +643,89 @@ Usage(char** argv, const std::string& msg = std::string())
 
 }  // namespace
 
+uint64_t concurrency_range[3] = {1, 1, 1};
+double request_rate_range[3] = {1.0, 1.0, 1.0};
+/*
+cb::BackendKind kind,
+bool verbose,
+bool extra_verbose,
+bool streaming,
+size_t max_threads,
+size_t sequence_length,
+int32_t percentile,
+uint64_t latency_threshold_ms,
+int32_t batch_size,
+bool using_batch_size,
+double stability_threshold,
+uint64_t measurement_window_ms,
+size_t max_trials,
+std::string model_name,
+std::string model_version,
+std::string model_signature_name,
+std::string url,
+std::string filename,
+pa::MeasurementMode measurement_mode,
+uint64_t measurement_request_count,
+cb::ProtocolType protocol,
+std::shared_ptr<cb::Headers> http_headers,
+cb::GrpcCompressionAlgorithm compression_algorithm,
+pa::SharedMemoryType shared_memory_type,
+size_t output_shm_size,
+std::unordered_map<std::string, std::vector<int64_t>> input_shapes,
+size_t string_length,
+std::string string_data,
+std::vector<std::string> user_data,
+bool zero_input,
+int32_t concurrent_request_count,
+size_t max_concurrency,
+uint32_t num_of_sequences,
+bool dynamic_concurrency_mode,
+bool async,
+bool forced_sync,
+bool using_concurrency_range,
+bool using_request_rate_range,
+bool using_custom_intervals,
+bool using_grpc_compression,
+pa::SearchMode search_mode,
+pa::Distribution request_distribution,
+std::string request_intervals_file,
+bool using_old_options,
+bool url_specified,
+bool max_threads_specified,
+const std::string DEFAULT_MEMORY_TYPE,
+std::string triton_server_path,
+std::string model_repository_path,
+std::string memory_type
+*/
+/*
+
+*/
 int
-main(int argc, char** argv)
+solve(
+    cb::BackendKind kind, bool verbose, bool extra_verbose, bool streaming,
+    size_t max_threads, size_t sequence_length, int32_t percentile,
+    uint64_t latency_threshold_ms, int32_t batch_size, bool using_batch_size,
+    double stability_threshold, uint64_t measurement_window_ms,
+    size_t max_trials, std::string model_name, std::string model_version,
+    std::string model_signature_name, std::string url, std::string filename,
+    pa::MeasurementMode measurement_mode, uint64_t measurement_request_count,
+    cb::ProtocolType protocol, std::shared_ptr<cb::Headers> http_headers,
+    cb::GrpcCompressionAlgorithm compression_algorithm,
+    pa::SharedMemoryType shared_memory_type, size_t output_shm_size,
+    std::unordered_map<std::string, std::vector<int64_t>> input_shapes,
+    size_t string_length, std::string string_data,
+    std::vector<std::string> user_data, bool zero_input,
+    int32_t concurrent_request_count, size_t max_concurrency,
+    uint32_t num_of_sequences, bool dynamic_concurrency_mode, bool async,
+    bool forced_sync, bool using_concurrency_range,
+    bool using_request_rate_range, bool using_custom_intervals,
+    bool using_grpc_compression, pa::SearchMode search_mode,
+    pa::Distribution request_distribution, std::string request_intervals_file,
+    bool using_old_options, bool url_specified, bool max_threads_specified,
+    const std::string DEFAULT_MEMORY_TYPE, std::string triton_server_path,
+    std::string model_repository_path, std::string memory_type)
 {
-  cb::BackendKind kind(cb::BackendKind::TRITON);
-  bool verbose = false;
-  bool extra_verbose = false;
-  bool streaming = false;
-  size_t max_threads = 4;
-  // average length of a sentence
-  size_t sequence_length = 20;
-  int32_t percentile = -1;
-  uint64_t latency_threshold_ms = pa::NO_LIMIT;
-  int32_t batch_size = 1;
-  bool using_batch_size = false;
-  uint64_t concurrency_range[3] = {1, 1, 1};
-  double request_rate_range[3] = {1.0, 1.0, 1.0};
-  double stability_threshold = 0.1;
-  uint64_t measurement_window_ms = 5000;
-  size_t max_trials = 10;
-  std::string model_name;
-  std::string model_version;
-  std::string model_signature_name("serving_default");
-  std::string url("localhost:8000");
-  std::string filename("");
-  pa::MeasurementMode measurement_mode = pa::MeasurementMode::TIME_WINDOWS;
-  uint64_t measurement_request_count = 50;
-  cb::ProtocolType protocol = cb::ProtocolType::HTTP;
-  std::shared_ptr<cb::Headers> http_headers(new cb::Headers());
-  cb::GrpcCompressionAlgorithm compression_algorithm =
-      cb::GrpcCompressionAlgorithm::COMPRESS_NONE;
-  pa::SharedMemoryType shared_memory_type = pa::NO_SHARED_MEMORY;
-  size_t output_shm_size = 100 * 1024;
-  std::unordered_map<std::string, std::vector<int64_t>> input_shapes;
-  size_t string_length = 128;
-  std::string string_data;
-  std::vector<std::string> user_data;
-  bool zero_input = false;
-  int32_t concurrent_request_count = 1;
-  size_t max_concurrency = 0;
-  uint32_t num_of_sequences = 4;
-  bool dynamic_concurrency_mode = false;
-  bool async = false;
-  bool forced_sync = false;
 
-  bool using_concurrency_range = false;
-  bool using_request_rate_range = false;
-  bool using_custom_intervals = false;
-  bool using_grpc_compression = false;
-  pa::SearchMode search_mode = pa::SearchMode::LINEAR;
-  pa::Distribution request_distribution = pa::Distribution::CONSTANT;
-  std::string request_intervals_file("");
-
-  // Required for detecting the use of conflicting options
-  bool using_old_options = false;
-  bool url_specified = false;
-  bool max_threads_specified = false;
-
-  // C Api backend required info
-  const std::string DEFAULT_MEMORY_TYPE = "system";
-  std::string triton_server_path;
-  std::string model_repository_path;
-  std::string memory_type = DEFAULT_MEMORY_TYPE;  // currently not used
-
-  // {name, has_arg, *flag, val}
-  static struct option long_options[] = {
-      {"streaming", 0, 0, 0},
-      {"max-threads", 1, 0, 1},
-      {"sequence-length", 1, 0, 2},
-      {"percentile", 1, 0, 3},
-      {"data-directory", 1, 0, 4},
-      {"shape", 1, 0, 5},
-      {"measurement-interval", 1, 0, 6},
-      {"concurrency-range", 1, 0, 7},
-      {"latency-threshold", 1, 0, 8},
-      {"stability-percentage", 1, 0, 9},
-      {"max-trials", 1, 0, 10},
-      {"input-data", 1, 0, 11},
-      {"string-length", 1, 0, 12},
-      {"string-data", 1, 0, 13},
-      {"async", 0, 0, 14},
-      {"sync", 0, 0, 15},
-      {"request-rate-range", 1, 0, 16},
-      {"num-of-sequences", 1, 0, 17},
-      {"binary-search", 0, 0, 18},
-      {"request-distribution", 1, 0, 19},
-      {"request-intervals", 1, 0, 20},
-      {"shared-memory", 1, 0, 21},
-      {"output-shared-memory-size", 1, 0, 22},
-      {"service-kind", 1, 0, 23},
-      {"model-signature-name", 1, 0, 24},
-      {"grpc-compression-algorithm", 1, 0, 25},
-      {"measurement-mode", 1, 0, 26},
-      {"measurement-request-count", 1, 0, 27},
-      {"triton-server-directory", 1, 0, 28},
-      {"model-repository", 1, 0, 29},
-      {0, 0, 0, 0}};
-
-  // Parse commandline...
-  int opt;
-  while ((opt = getopt_long(
-              argc, argv, "vdazc:u:m:x:b:t:p:i:H:l:r:s:f:", long_options,
-              NULL)) != -1) {
-    switch (opt) {
-      case 0:
-        streaming = true;
-        break;
-      case 1:
-        max_threads = std::atoi(optarg);
-        max_threads_specified = true;
-        break;
-      case 2:
-        sequence_length = std::atoi(optarg);
-        break;
-      case 3:
-        percentile = std::atoi(optarg);
-        break;
-      case 4:
-        user_data.push_back(optarg);
-        break;
-      case 5: {
-        std::string arg = optarg;
-        std::string name = arg.substr(0, arg.rfind(":"));
-        std::string shape_str = arg.substr(name.size() + 1);
-        size_t pos = 0;
-        std::vector<int64_t> shape;
-        try {
-          while (pos != std::string::npos) {
-            size_t comma_pos = shape_str.find(",", pos);
-            int64_t dim;
-            if (comma_pos == std::string::npos) {
-              dim = std::stoll(shape_str.substr(pos, comma_pos));
-              pos = comma_pos;
-            } else {
-              dim = std::stoll(shape_str.substr(pos, comma_pos - pos));
-              pos = comma_pos + 1;
-            }
-            if (dim <= 0) {
-              Usage(argv, "input shape must be > 0");
-            }
-            shape.emplace_back(dim);
-          }
-        }
-        catch (const std::invalid_argument& ia) {
-          Usage(argv, "failed to parse input shape: " + std::string(optarg));
-        }
-        input_shapes[name] = shape;
-        break;
-      }
-      case 6: {
-        measurement_window_ms = std::atoi(optarg);
-        break;
-      }
-      case 7: {
-        using_concurrency_range = true;
-        std::string arg = optarg;
-        size_t pos = 0;
-        int index = 0;
-        try {
-          while (pos != std::string::npos) {
-            size_t colon_pos = arg.find(":", pos);
-            if (index > 2) {
-              Usage(
-                  argv,
-                  "option concurrency-range can have maximum of three "
-                  "elements");
-            }
-            if (colon_pos == std::string::npos) {
-              concurrency_range[index] = std::stoll(arg.substr(pos, colon_pos));
-              pos = colon_pos;
-            } else {
-              concurrency_range[index] =
-                  std::stoll(arg.substr(pos, colon_pos - pos));
-              pos = colon_pos + 1;
-              index++;
-            }
-          }
-        }
-        catch (const std::invalid_argument& ia) {
-          Usage(
-              argv,
-              "failed to parse concurrency range: " + std::string(optarg));
-        }
-        break;
-      }
-      case 8: {
-        latency_threshold_ms = std::atoi(optarg);
-        break;
-      }
-      case 9: {
-        stability_threshold = atof(optarg) / 100;
-        break;
-      }
-      case 10: {
-        max_trials = std::atoi(optarg);
-        break;
-      }
-      case 11: {
-        std::string arg = optarg;
-        // Check whether the argument is a directory
-        if (pa::IsDirectory(arg) || pa::IsFile(arg)) {
-          user_data.push_back(optarg);
-        } else if (arg.compare("zero") == 0) {
-          zero_input = true;
-        } else if (arg.compare("random") == 0) {
-          break;
-        } else {
-          Usage(argv, "unsupported input data provided " + std::string(optarg));
-        }
-        break;
-      }
-      case 12: {
-        string_length = std::atoi(optarg);
-        break;
-      }
-      case 13: {
-        string_data = optarg;
-        break;
-      }
-      case 14: {
-        async = true;
-        break;
-      }
-      case 15: {
-        forced_sync = true;
-        break;
-      }
-      case 16: {
-        using_request_rate_range = true;
-        std::string arg = optarg;
-        size_t pos = 0;
-        int index = 0;
-        try {
-          while (pos != std::string::npos) {
-            size_t colon_pos = arg.find(":", pos);
-            if (index > 2) {
-              Usage(
-                  argv,
-                  "option request_rate_range can have maximum of three "
-                  "elements");
-            }
-            if (colon_pos == std::string::npos) {
-              request_rate_range[index] = std::stod(arg.substr(pos, colon_pos));
-              pos = colon_pos;
-            } else {
-              request_rate_range[index] =
-                  std::stod(arg.substr(pos, colon_pos - pos));
-              pos = colon_pos + 1;
-              index++;
-            }
-          }
-        }
-        catch (const std::invalid_argument& ia) {
-          Usage(
-              argv,
-              "failed to parse request rate range: " + std::string(optarg));
-        }
-        break;
-      }
-      case 17: {
-        num_of_sequences = std::atoi(optarg);
-        break;
-      }
-      case 18: {
-        search_mode = pa::SearchMode::BINARY;
-        break;
-      }
-      case 19: {
-        std::string arg = optarg;
-        if (arg.compare("poisson") == 0) {
-          request_distribution = pa::Distribution::POISSON;
-        } else if (arg.compare("constant") == 0) {
-          request_distribution = pa::Distribution::CONSTANT;
-        } else {
-          Usage(
-              argv, "unsupported request distribution provided " +
-                        std::string(optarg));
-        }
-        break;
-      }
-      case 20:
-        using_custom_intervals = true;
-        request_intervals_file = optarg;
-        break;
-      case 21: {
-        std::string arg = optarg;
-        if (arg.compare("system") == 0) {
-          shared_memory_type = pa::SharedMemoryType::SYSTEM_SHARED_MEMORY;
-        } else if (arg.compare("cuda") == 0) {
-#ifdef TRITON_ENABLE_GPU
-          shared_memory_type = pa::SharedMemoryType::CUDA_SHARED_MEMORY;
-#else
-          Usage(
-              argv,
-              "cuda shared memory is not supported when TRITON_ENABLE_GPU=0");
-#endif  // TRITON_ENABLE_GPU
-        }
-        break;
-      }
-      case 22: {
-        output_shm_size = std::atoi(optarg);
-        break;
-      }
-      case 23: {
-        std::string arg = optarg;
-        if (arg.compare("triton") == 0) {
-          kind = cb::TRITON;
-        } else if (arg.compare("tfserving") == 0) {
-          kind = cb::TENSORFLOW_SERVING;
-        } else if (arg.compare("torchserve") == 0) {
-          kind = cb::TORCHSERVE;
-        } else if (arg.compare("triton_c_api") == 0) {
-          kind = cb::TRITON_C_API;
-        } else {
-          Usage(argv, "unsupported --service-kind specified");
-        }
-        break;
-      }
-      case 24:
-        model_signature_name = optarg;
-        break;
-      case 25: {
-        using_grpc_compression = true;
-        std::string arg = optarg;
-        if (arg.compare("none") == 0) {
-          compression_algorithm = cb::COMPRESS_NONE;
-        } else if (arg.compare("deflate") == 0) {
-          compression_algorithm = cb::COMPRESS_DEFLATE;
-        } else if (arg.compare("gzip") == 0) {
-          compression_algorithm = cb::COMPRESS_GZIP;
-        } else if (arg.compare("stream_gzip") == 0) {
-          compression_algorithm = cb::COMPRESS_STREAM_GZIP;
-        } else {
-          Usage(argv, "unsupported --grpc-compression-algorithm specified");
-        }
-        break;
-      }
-      case 26: {
-        std::string arg = optarg;
-        if (arg.compare("time_windows") == 0) {
-          measurement_mode = pa::MeasurementMode::TIME_WINDOWS;
-        } else if (arg.compare("count_windows") == 0) {
-          measurement_mode = pa::MeasurementMode::COUNT_WINDOWS;
-        } else {
-          Usage(argv, "unsupported --measurement-mode specified");
-        }
-        break;
-      }
-      case 27: {
-        measurement_request_count = std::atoi(optarg);
-        break;
-      }
-      case 28: {
-        triton_server_path = optarg;
-        break;
-      }
-      case 29: {
-        model_repository_path = optarg;
-        break;
-      }
-      case 'v':
-        extra_verbose = verbose;
-        verbose = true;
-        break;
-      case 'z':
-        zero_input = true;
-        break;
-      case 'd':
-        using_old_options = true;
-        dynamic_concurrency_mode = true;
-        break;
-      case 'u':
-        url_specified = true;
-        url = optarg;
-        break;
-      case 'm':
-        model_name = optarg;
-        break;
-      case 'x':
-        model_version = optarg;
-        break;
-      case 'b':
-        batch_size = std::atoi(optarg);
-        using_batch_size = true;
-        break;
-      case 't':
-        using_old_options = true;
-        concurrent_request_count = std::atoi(optarg);
-        break;
-      case 'p':
-        measurement_window_ms = std::atoi(optarg);
-        break;
-      case 'i':
-        protocol = pa::ParseProtocol(optarg);
-        break;
-      case 'H': {
-        std::string arg = optarg;
-        std::string header = arg.substr(0, arg.find(":"));
-        (*http_headers)[header] = arg.substr(header.size() + 1);
-        break;
-      }
-      case 'l':
-        latency_threshold_ms = std::atoi(optarg);
-        break;
-      case 'c':
-        using_old_options = true;
-        max_concurrency = std::atoi(optarg);
-        break;
-      case 'r':
-        max_trials = std::atoi(optarg);
-        break;
-      case 's':
-        stability_threshold = atof(optarg) / 100;
-        break;
-      case 'f':
-        filename = optarg;
-        break;
-      case 'a':
-        async = true;
-        break;
-      case '?':
-        Usage(argv);
-        break;
-    }
-  }
-
-  std::cout<<"Hello World!"<<std::endl;
-
-  if (model_name.empty()) {
-    Usage(argv, "-m flag must be specified");
-  }
-  if (batch_size <= 0) {
-    Usage(argv, "batch size must be > 0");
-  }
-  if (measurement_window_ms <= 0) {
-    Usage(argv, "measurement window must be > 0 in msec");
-  }
-  if (measurement_request_count <= 0) {
-    Usage(argv, "measurement request count must be > 0");
-  }
-  if (concurrency_range[SEARCH_RANGE::kSTART] <= 0 ||
-      concurrent_request_count < 0) {
-    Usage(argv, "The start of the search range must be > 0");
-  }
-  if (request_rate_range[SEARCH_RANGE::kSTART] <= 0) {
-    Usage(argv, "The start of the search range must be > 0");
-  }
-  if (protocol == cb::ProtocolType::UNKNOWN) {
-    Usage(argv, "protocol should be either HTTP or gRPC");
-  }
-  if (streaming && (protocol != cb::ProtocolType::GRPC)) {
-    Usage(argv, "streaming is only allowed with gRPC protocol");
-  }
-  if (using_grpc_compression && (protocol != cb::ProtocolType::GRPC)) {
-    Usage(argv, "compression is only allowed with gRPC protocol");
-  }
-  if (max_threads == 0) {
-    Usage(argv, "maximum number of threads must be > 0");
-  }
-  if (sequence_length == 0) {
-    sequence_length = 20;
-    std::cerr << "WARNING: using an invalid sequence length. Perf Analyzer will"
-              << " use default value if it is measuring on sequence model."
-              << std::endl;
-  }
-  if (percentile != -1 && (percentile > 99 || percentile < 1)) {
-    Usage(argv, "percentile must be -1 for not reporting or in range (0, 100)");
-  }
-  if (zero_input && !user_data.empty()) {
-    Usage(argv, "zero input can't be set when data directory is provided");
-  }
-  if (async && forced_sync) {
-    Usage(argv, "Both --async and --sync can not be specified simultaneously.");
-  }
-
-  if (using_concurrency_range && using_old_options) {
-    Usage(argv, "can not use deprecated options with --concurrency-range");
-  } else if (using_old_options) {
-    if (dynamic_concurrency_mode) {
-      concurrency_range[SEARCH_RANGE::kEND] = max_concurrency;
-    }
-    concurrency_range[SEARCH_RANGE::kSTART] = concurrent_request_count;
-  }
-
-  if (using_request_rate_range && using_old_options) {
-    Usage(argv, "can not use concurrency options with --request-rate-range");
-  }
-
-  if (using_request_rate_range && using_concurrency_range) {
-    Usage(
-        argv,
-        "can not specify concurrency_range and request_rate_range "
-        "simultaneously");
-  }
-
-  if (using_custom_intervals && using_old_options) {
-    Usage(argv, "can not use deprecated options with --request-intervals");
-  }
-
-  if ((using_custom_intervals) &&
-      (using_request_rate_range || using_concurrency_range)) {
-    Usage(
-        argv,
-        "can not use --concurrency-range or --request-rate-range "
-        "along with --request-intervals");
-  }
-
-  if (((concurrency_range[SEARCH_RANGE::kEND] == pa::NO_LIMIT) ||
-       (request_rate_range[SEARCH_RANGE::kEND] ==
-        static_cast<double>(pa::NO_LIMIT))) &&
-      (latency_threshold_ms == pa::NO_LIMIT)) {
-    Usage(
-        argv,
-        "The end of the search range and the latency limit can not be both 0 "
-        "(or 0.0) simultaneously");
-  }
-
-  if (((concurrency_range[SEARCH_RANGE::kEND] == pa::NO_LIMIT) ||
-       (request_rate_range[SEARCH_RANGE::kEND] ==
-        static_cast<double>(pa::NO_LIMIT))) &&
-      (search_mode == pa::SearchMode::BINARY)) {
-    Usage(
-        argv,
-        "The end of the range can not be 0 (or 0.0) for binary search mode.");
-  }
-
-  if ((search_mode == pa::SearchMode::BINARY) &&
-      (latency_threshold_ms == pa::NO_LIMIT)) {
-    Usage(argv, "The latency threshold can not be 0 for binary search mode.");
-  }
-
-  if (((concurrency_range[SEARCH_RANGE::kEND] <
-        concurrency_range[SEARCH_RANGE::kSTART]) ||
-       (request_rate_range[SEARCH_RANGE::kEND] <
-        request_rate_range[SEARCH_RANGE::kSTART])) &&
-      (search_mode == pa::SearchMode::BINARY)) {
-    Usage(
-        argv,
-        "The end of the range can not be less than start of the range for "
-        "binary search mode.");
-  }
 
   if (!url_specified && (protocol == cb::ProtocolType::GRPC)) {
     if (kind == cb::BackendKind::TRITON) {
@@ -1666,6 +1211,582 @@ main(int argc, char** argv)
         }
       }
     }
+  }
+  return 0;
+}
+
+int
+main(int argc, char** argv)
+{
+  cb::BackendKind kind(cb::BackendKind::TRITON);
+  bool verbose = false;
+  bool extra_verbose = false;
+  bool streaming = false;
+  size_t max_threads = 4;
+  // average length of a sentence
+  size_t sequence_length = 20;
+  int32_t percentile = -1;
+  uint64_t latency_threshold_ms = pa::NO_LIMIT;
+  int32_t batch_size = 1;
+  bool using_batch_size = false;
+  uint64_t concurrency_range[3] = {1, 1, 1};
+  double request_rate_range[3] = {1.0, 1.0, 1.0};
+  double stability_threshold = 0.1;
+  uint64_t measurement_window_ms = 5000;
+  size_t max_trials = 10;
+  std::string model_name;
+  std::string model_version;
+  std::string model_signature_name("serving_default");
+  std::string url("localhost:8000");
+  std::string filename("");
+  pa::MeasurementMode measurement_mode = pa::MeasurementMode::TIME_WINDOWS;
+  uint64_t measurement_request_count = 50;
+  cb::ProtocolType protocol = cb::ProtocolType::HTTP;
+  std::shared_ptr<cb::Headers> http_headers(new cb::Headers());
+  cb::GrpcCompressionAlgorithm compression_algorithm =
+      cb::GrpcCompressionAlgorithm::COMPRESS_NONE;
+  pa::SharedMemoryType shared_memory_type = pa::NO_SHARED_MEMORY;
+  size_t output_shm_size = 100 * 1024;
+  std::unordered_map<std::string, std::vector<int64_t>> input_shapes;
+  size_t string_length = 128;
+  std::string string_data;
+  std::vector<std::string> user_data;
+  bool zero_input = false;
+  int32_t concurrent_request_count = 1;
+  size_t max_concurrency = 0;
+  uint32_t num_of_sequences = 4;
+  bool dynamic_concurrency_mode = false;
+  bool async = false;
+  bool forced_sync = false;
+
+  bool using_concurrency_range = false;
+  bool using_request_rate_range = false;
+  bool using_custom_intervals = false;
+  bool using_grpc_compression = false;
+  pa::SearchMode search_mode = pa::SearchMode::LINEAR;
+  pa::Distribution request_distribution = pa::Distribution::CONSTANT;
+  std::string request_intervals_file("");
+
+  // Required for detecting the use of conflicting options
+  bool using_old_options = false;
+  bool url_specified = false;
+  bool max_threads_specified = false;
+
+  // C Api backend required info
+  const std::string DEFAULT_MEMORY_TYPE = "system";
+  std::string triton_server_path;
+  std::string model_repository_path;
+  std::string memory_type = DEFAULT_MEMORY_TYPE;  // currently not used
+
+  // {name, has_arg, *flag, val}
+  static struct option long_options[] = {
+      {"streaming", 0, 0, 0},
+      {"max-threads", 1, 0, 1},
+      {"sequence-length", 1, 0, 2},
+      {"percentile", 1, 0, 3},
+      {"data-directory", 1, 0, 4},
+      {"shape", 1, 0, 5},
+      {"measurement-interval", 1, 0, 6},
+      {"concurrency-range", 1, 0, 7},
+      {"latency-threshold", 1, 0, 8},
+      {"stability-percentage", 1, 0, 9},
+      {"max-trials", 1, 0, 10},
+      {"input-data", 1, 0, 11},
+      {"string-length", 1, 0, 12},
+      {"string-data", 1, 0, 13},
+      {"async", 0, 0, 14},
+      {"sync", 0, 0, 15},
+      {"request-rate-range", 1, 0, 16},
+      {"num-of-sequences", 1, 0, 17},
+      {"binary-search", 0, 0, 18},
+      {"request-distribution", 1, 0, 19},
+      {"request-intervals", 1, 0, 20},
+      {"shared-memory", 1, 0, 21},
+      {"output-shared-memory-size", 1, 0, 22},
+      {"service-kind", 1, 0, 23},
+      {"model-signature-name", 1, 0, 24},
+      {"grpc-compression-algorithm", 1, 0, 25},
+      {"measurement-mode", 1, 0, 26},
+      {"measurement-request-count", 1, 0, 27},
+      {"triton-server-directory", 1, 0, 28},
+      {"model-repository", 1, 0, 29},
+      {0, 0, 0, 0}};
+
+  // Parse commandline...
+  int opt;
+  while ((opt = getopt_long(
+              argc, argv, "vdazc:u:m:x:b:t:p:i:H:l:r:s:f:", long_options,
+              NULL)) != -1) {
+    switch (opt) {
+      case 0:
+        streaming = true;
+        break;
+      case 1:
+        max_threads = std::atoi(optarg);
+        max_threads_specified = true;
+        break;
+      case 2:
+        sequence_length = std::atoi(optarg);
+        break;
+      case 3:
+        percentile = std::atoi(optarg);
+        break;
+      case 4:
+        user_data.push_back(optarg);
+        break;
+      case 5: {
+        std::string arg = optarg;
+        std::string name = arg.substr(0, arg.rfind(":"));
+        std::string shape_str = arg.substr(name.size() + 1);
+        size_t pos = 0;
+        std::vector<int64_t> shape;
+        try {
+          while (pos != std::string::npos) {
+            size_t comma_pos = shape_str.find(",", pos);
+            int64_t dim;
+            if (comma_pos == std::string::npos) {
+              dim = std::stoll(shape_str.substr(pos, comma_pos));
+              pos = comma_pos;
+            } else {
+              dim = std::stoll(shape_str.substr(pos, comma_pos - pos));
+              pos = comma_pos + 1;
+            }
+            if (dim <= 0) {
+              Usage(argv, "input shape must be > 0");
+            }
+            shape.emplace_back(dim);
+          }
+        }
+        catch (const std::invalid_argument& ia) {
+          Usage(argv, "failed to parse input shape: " + std::string(optarg));
+        }
+        input_shapes[name] = shape;
+        break;
+      }
+      case 6: {
+        measurement_window_ms = std::atoi(optarg);
+        break;
+      }
+      case 7: {
+        using_concurrency_range = true;
+        std::string arg = optarg;
+        size_t pos = 0;
+        int index = 0;
+        try {
+          while (pos != std::string::npos) {
+            size_t colon_pos = arg.find(":", pos);
+            if (index > 2) {
+              Usage(
+                  argv,
+                  "option concurrency-range can have maximum of three "
+                  "elements");
+            }
+            if (colon_pos == std::string::npos) {
+              concurrency_range[index] = std::stoll(arg.substr(pos, colon_pos));
+              pos = colon_pos;
+            } else {
+              concurrency_range[index] =
+                  std::stoll(arg.substr(pos, colon_pos - pos));
+              pos = colon_pos + 1;
+              index++;
+            }
+          }
+        }
+        catch (const std::invalid_argument& ia) {
+          Usage(
+              argv,
+              "failed to parse concurrency range: " + std::string(optarg));
+        }
+        break;
+      }
+      case 8: {
+        latency_threshold_ms = std::atoi(optarg);
+        break;
+      }
+      case 9: {
+        stability_threshold = atof(optarg) / 100;
+        break;
+      }
+      case 10: {
+        max_trials = std::atoi(optarg);
+        break;
+      }
+      case 11: {
+        std::string arg = optarg;
+        // Check whether the argument is a directory
+        if (pa::IsDirectory(arg) || pa::IsFile(arg)) {
+          user_data.push_back(optarg);
+        } else if (arg.compare("zero") == 0) {
+          zero_input = true;
+        } else if (arg.compare("random") == 0) {
+          break;
+        } else {
+          Usage(argv, "unsupported input data provided " + std::string(optarg));
+        }
+        break;
+      }
+      case 12: {
+        string_length = std::atoi(optarg);
+        break;
+      }
+      case 13: {
+        string_data = optarg;
+        break;
+      }
+      case 14: {
+        async = true;
+        break;
+      }
+      case 15: {
+        forced_sync = true;
+        break;
+      }
+      case 16: {
+        using_request_rate_range = true;
+        std::string arg = optarg;
+        size_t pos = 0;
+        int index = 0;
+        try {
+          while (pos != std::string::npos) {
+            size_t colon_pos = arg.find(":", pos);
+            if (index > 2) {
+              Usage(
+                  argv,
+                  "option request_rate_range can have maximum of three "
+                  "elements");
+            }
+            if (colon_pos == std::string::npos) {
+              request_rate_range[index] = std::stod(arg.substr(pos, colon_pos));
+              pos = colon_pos;
+            } else {
+              request_rate_range[index] =
+                  std::stod(arg.substr(pos, colon_pos - pos));
+              pos = colon_pos + 1;
+              index++;
+            }
+          }
+        }
+        catch (const std::invalid_argument& ia) {
+          Usage(
+              argv,
+              "failed to parse request rate range: " + std::string(optarg));
+        }
+        break;
+      }
+      case 17: {
+        num_of_sequences = std::atoi(optarg);
+        break;
+      }
+      case 18: {
+        search_mode = pa::SearchMode::BINARY;
+        break;
+      }
+      case 19: {
+        std::string arg = optarg;
+        if (arg.compare("poisson") == 0) {
+          request_distribution = pa::Distribution::POISSON;
+        } else if (arg.compare("constant") == 0) {
+          request_distribution = pa::Distribution::CONSTANT;
+        } else {
+          Usage(
+              argv, "unsupported request distribution provided " +
+                        std::string(optarg));
+        }
+        break;
+      }
+      case 20:
+        using_custom_intervals = true;
+        request_intervals_file = optarg;
+        break;
+      case 21: {
+        std::string arg = optarg;
+        if (arg.compare("system") == 0) {
+          shared_memory_type = pa::SharedMemoryType::SYSTEM_SHARED_MEMORY;
+        } else if (arg.compare("cuda") == 0) {
+#ifdef TRITON_ENABLE_GPU
+          shared_memory_type = pa::SharedMemoryType::CUDA_SHARED_MEMORY;
+#else
+          Usage(
+              argv,
+              "cuda shared memory is not supported when TRITON_ENABLE_GPU=0");
+#endif  // TRITON_ENABLE_GPU
+        }
+        break;
+      }
+      case 22: {
+        output_shm_size = std::atoi(optarg);
+        break;
+      }
+      case 23: {
+        std::string arg = optarg;
+        if (arg.compare("triton") == 0) {
+          kind = cb::TRITON;
+        } else if (arg.compare("tfserving") == 0) {
+          kind = cb::TENSORFLOW_SERVING;
+        } else if (arg.compare("torchserve") == 0) {
+          kind = cb::TORCHSERVE;
+        } else if (arg.compare("triton_c_api") == 0) {
+          kind = cb::TRITON_C_API;
+        } else {
+          Usage(argv, "unsupported --service-kind specified");
+        }
+        break;
+      }
+      case 24:
+        model_signature_name = optarg;
+        break;
+      case 25: {
+        using_grpc_compression = true;
+        std::string arg = optarg;
+        if (arg.compare("none") == 0) {
+          compression_algorithm = cb::COMPRESS_NONE;
+        } else if (arg.compare("deflate") == 0) {
+          compression_algorithm = cb::COMPRESS_DEFLATE;
+        } else if (arg.compare("gzip") == 0) {
+          compression_algorithm = cb::COMPRESS_GZIP;
+        } else if (arg.compare("stream_gzip") == 0) {
+          compression_algorithm = cb::COMPRESS_STREAM_GZIP;
+        } else {
+          Usage(argv, "unsupported --grpc-compression-algorithm specified");
+        }
+        break;
+      }
+      case 26: {
+        std::string arg = optarg;
+        if (arg.compare("time_windows") == 0) {
+          measurement_mode = pa::MeasurementMode::TIME_WINDOWS;
+        } else if (arg.compare("count_windows") == 0) {
+          measurement_mode = pa::MeasurementMode::COUNT_WINDOWS;
+        } else {
+          Usage(argv, "unsupported --measurement-mode specified");
+        }
+        break;
+      }
+      case 27: {
+        measurement_request_count = std::atoi(optarg);
+        break;
+      }
+      case 28: {
+        triton_server_path = optarg;
+        break;
+      }
+      case 29: {
+        model_repository_path = optarg;
+        break;
+      }
+      case 'v':
+        extra_verbose = verbose;
+        verbose = true;
+        break;
+      case 'z':
+        zero_input = true;
+        break;
+      case 'd':
+        using_old_options = true;
+        dynamic_concurrency_mode = true;
+        break;
+      case 'u':
+        url_specified = true;
+        url = optarg;
+        break;
+      case 'm':
+        model_name = optarg;
+        break;
+      case 'x':
+        model_version = optarg;
+        break;
+      case 'b':
+        batch_size = std::atoi(optarg);
+        using_batch_size = true;
+        break;
+      case 't':
+        using_old_options = true;
+        concurrent_request_count = std::atoi(optarg);
+        break;
+      case 'p':
+        measurement_window_ms = std::atoi(optarg);
+        break;
+      case 'i':
+        protocol = pa::ParseProtocol(optarg);
+        break;
+      case 'H': {
+        std::string arg = optarg;
+        std::string header = arg.substr(0, arg.find(":"));
+        (*http_headers)[header] = arg.substr(header.size() + 1);
+        break;
+      }
+      case 'l':
+        latency_threshold_ms = std::atoi(optarg);
+        break;
+      case 'c':
+        using_old_options = true;
+        max_concurrency = std::atoi(optarg);
+        break;
+      case 'r':
+        max_trials = std::atoi(optarg);
+        break;
+      case 's':
+        stability_threshold = atof(optarg) / 100;
+        break;
+      case 'f':
+        filename = optarg;
+        break;
+      case 'a':
+        async = true;
+        break;
+      case '?':
+        Usage(argv);
+        break;
+    }
+  }
+
+  if (model_name.empty()) {
+    Usage(argv, "-m flag must be specified");
+  }
+  if (batch_size <= 0) {
+    Usage(argv, "batch size must be > 0");
+  }
+  if (measurement_window_ms <= 0) {
+    Usage(argv, "measurement window must be > 0 in msec");
+  }
+  if (measurement_request_count <= 0) {
+    Usage(argv, "measurement request count must be > 0");
+  }
+  if (concurrency_range[SEARCH_RANGE::kSTART] <= 0 ||
+      concurrent_request_count < 0) {
+    Usage(argv, "The start of the search range must be > 0");
+  }
+  if (request_rate_range[SEARCH_RANGE::kSTART] <= 0) {
+    Usage(argv, "The start of the search range must be > 0");
+  }
+  if (protocol == cb::ProtocolType::UNKNOWN) {
+    Usage(argv, "protocol should be either HTTP or gRPC");
+  }
+  if (streaming && (protocol != cb::ProtocolType::GRPC)) {
+    Usage(argv, "streaming is only allowed with gRPC protocol");
+  }
+  if (using_grpc_compression && (protocol != cb::ProtocolType::GRPC)) {
+    Usage(argv, "compression is only allowed with gRPC protocol");
+  }
+  if (max_threads == 0) {
+    Usage(argv, "maximum number of threads must be > 0");
+  }
+  if (sequence_length == 0) {
+    sequence_length = 20;
+    std::cerr << "WARNING: using an invalid sequence length. Perf Analyzer will"
+              << " use default value if it is measuring on sequence model."
+              << std::endl;
+  }
+  if (percentile != -1 && (percentile > 99 || percentile < 1)) {
+    Usage(argv, "percentile must be -1 for not reporting or in range (0, 100)");
+  }
+  if (zero_input && !user_data.empty()) {
+    Usage(argv, "zero input can't be set when data directory is provided");
+  }
+  if (async && forced_sync) {
+    Usage(argv, "Both --async and --sync can not be specified simultaneously.");
+  }
+
+  if (using_concurrency_range && using_old_options) {
+    Usage(argv, "can not use deprecated options with --concurrency-range");
+  } else if (using_old_options) {
+    if (dynamic_concurrency_mode) {
+      concurrency_range[SEARCH_RANGE::kEND] = max_concurrency;
+    }
+    concurrency_range[SEARCH_RANGE::kSTART] = concurrent_request_count;
+  }
+
+  if (using_request_rate_range && using_old_options) {
+    Usage(argv, "can not use concurrency options with --request-rate-range");
+  }
+
+  if (using_request_rate_range && using_concurrency_range) {
+    Usage(
+        argv,
+        "can not specify concurrency_range and request_rate_range "
+        "simultaneously");
+  }
+
+  if (using_custom_intervals && using_old_options) {
+    Usage(argv, "can not use deprecated options with --request-intervals");
+  }
+
+  if ((using_custom_intervals) &&
+      (using_request_rate_range || using_concurrency_range)) {
+    Usage(
+        argv,
+        "can not use --concurrency-range or --request-rate-range "
+        "along with --request-intervals");
+  }
+
+  if (((concurrency_range[SEARCH_RANGE::kEND] == pa::NO_LIMIT) ||
+       (request_rate_range[SEARCH_RANGE::kEND] ==
+        static_cast<double>(pa::NO_LIMIT))) &&
+      (latency_threshold_ms == pa::NO_LIMIT)) {
+    Usage(
+        argv,
+        "The end of the search range and the latency limit can not be both 0 "
+        "(or 0.0) simultaneously");
+  }
+
+  if (((concurrency_range[SEARCH_RANGE::kEND] == pa::NO_LIMIT) ||
+       (request_rate_range[SEARCH_RANGE::kEND] ==
+        static_cast<double>(pa::NO_LIMIT))) &&
+      (search_mode == pa::SearchMode::BINARY)) {
+    Usage(
+        argv,
+        "The end of the range can not be 0 (or 0.0) for binary search mode.");
+  }
+
+  if ((search_mode == pa::SearchMode::BINARY) &&
+      (latency_threshold_ms == pa::NO_LIMIT)) {
+    Usage(argv, "The latency threshold can not be 0 for binary search mode.");
+  }
+
+  if (((concurrency_range[SEARCH_RANGE::kEND] <
+        concurrency_range[SEARCH_RANGE::kSTART]) ||
+       (request_rate_range[SEARCH_RANGE::kEND] <
+        request_rate_range[SEARCH_RANGE::kSTART])) &&
+      (search_mode == pa::SearchMode::BINARY)) {
+    Usage(
+        argv,
+        "The end of the range can not be less than start of the range for "
+        "binary search mode.");
+  }
+  if (solve(
+          kind, verbose, extra_verbose, streaming, max_threads, sequence_length,
+          percentile, latency_threshold_ms, batch_size, using_batch_size,
+          stability_threshold, measurement_window_ms, max_trials, model_name,
+          model_version, model_signature_name, url, filename, measurement_mode,
+          measurement_request_count, protocol, http_headers,
+          compression_algorithm, shared_memory_type, output_shm_size,
+          input_shapes, string_length, string_data, user_data, zero_input,
+          concurrent_request_count, max_concurrency, num_of_sequences,
+          dynamic_concurrency_mode, async, forced_sync, using_concurrency_range,
+          using_request_rate_range, using_custom_intervals,
+          using_grpc_compression, search_mode, request_distribution,
+          request_intervals_file, using_old_options, url_specified,
+          max_threads_specified, DEFAULT_MEMORY_TYPE, triton_server_path,
+          model_repository_path, memory_type)) {
+    return 1;
+  }
+  url = "localhost:8004";
+  if (solve(
+          kind, verbose, extra_verbose, streaming, max_threads, sequence_length,
+          percentile, latency_threshold_ms, batch_size, using_batch_size,
+          stability_threshold, measurement_window_ms, max_trials, model_name,
+          model_version, model_signature_name, url, filename, measurement_mode,
+          measurement_request_count, protocol, http_headers,
+          compression_algorithm, shared_memory_type, output_shm_size,
+          input_shapes, string_length, string_data, user_data, zero_input,
+          concurrent_request_count, max_concurrency, num_of_sequences,
+          dynamic_concurrency_mode, async, forced_sync, using_concurrency_range,
+          using_request_rate_range, using_custom_intervals,
+          using_grpc_compression, search_mode, request_distribution,
+          request_intervals_file, using_old_options, url_specified,
+          max_threads_specified, DEFAULT_MEMORY_TYPE, triton_server_path,
+          model_repository_path, memory_type)) {
+    return 1;
   }
   return 0;
 }
