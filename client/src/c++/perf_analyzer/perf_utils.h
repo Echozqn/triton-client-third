@@ -59,6 +59,18 @@ std::string const character_set =
 
 // A boolean flag to mark an interrupt and commencement of early exit
 extern volatile bool early_exit;
+//change_server表示是否进行服务器的切换
+extern volatile bool change_server;
+//时延阀值，总请求，违规请求
+extern volatile uint64_t max_time_delay_ns;
+extern volatile uint64_t sum_request;
+extern volatile uint64_t bad_request;
+//违规率
+extern volatile double bad_reuqest_rate;
+extern volatile int filenameId;
+
+#define debug(x) std::cout<<#x<<" = "<<x<<std::endl;
+
 
 enum Distribution { POISSON = 0, CONSTANT = 1, CUSTOM = 2 };
 enum SearchMode { LINEAR = 0, BINARY = 1, NONE = 2 };

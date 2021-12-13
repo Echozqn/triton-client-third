@@ -254,7 +254,7 @@ RequestRateManager::Infer(
       // Wait if no request should be sent and it is not exiting
       thread_config->is_paused_ = true;
       std::unique_lock<std::mutex> lock(wake_mutex_);
-      wake_signal_.wait(lock, [this]() { return early_exit || execute_; });
+      wake_signal_.wait(lock, [this]() { return change_server||early_exit || execute_; });
     }
 
     thread_config->is_paused_ = false;
@@ -325,7 +325,7 @@ RequestRateManager::Infer(
           thread_stat);
     }
 
-    if (early_exit || (!thread_stat->cb_status_.IsOk())) {
+    if (change_server||early_exit || (!thread_stat->cb_status_.IsOk())) {
       if (on_sequence_model_) {
         // Finish off all the ongoing sequences for graceful exit
         for (size_t i = thread_config->id_; i < sequence_stat_.size();

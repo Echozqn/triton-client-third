@@ -419,6 +419,7 @@ class InferenceProfiler {
   bool extra_percentile_;
   size_t percentile_;
   uint64_t latency_threshold_ms_;
+  TimestampVector total_client;
 
   cb::ProtocolType protocol_;
   std::string model_name_;

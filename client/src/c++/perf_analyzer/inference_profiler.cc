@@ -445,6 +445,7 @@ InferenceProfiler::ProfileHelper(
   LoadStatus load_status;
   size_t completed_trials = 0;
   std::queue<cb::Error> error;
+  total_client.clear();
 
   do {
     RETURN_IF_ERROR(manager_->CheckHealth());
@@ -539,7 +540,7 @@ InferenceProfiler::ProfileHelper(
           *is_stable = false;
         }
       }
-      if (*is_stable) {
+      if (*is_stable && completed_trials >= max_trials_) {
         break;
       }
       if ((!within_threshold) && (latency_threshold_ms_ != NO_LIMIT)) {
@@ -547,6 +548,11 @@ InferenceProfiler::ProfileHelper(
       }
     }
     completed_trials++;
+    if(change_server) {
+      debug("Change server!!!")
+      debug(completed_trials)
+      break;
+    }
   } while ((!early_exit) && (completed_trials < max_trials_));
 
   // return the appropriate error which might have occured in the
@@ -556,6 +562,19 @@ InferenceProfiler::ProfileHelper(
       return error.front();
     } else {
       error.pop();
+    }
+  }
+  std::string filename = "client_trace"+std::to_string(pa::filenameId)+".csv";
+  std::ofstream f(filename);  
+  if(f.is_open()) {
+    for(int i = 0; i < total_client.size(); ++i) {
+      // std::cout << std::get<2>(total_client[i]) << ","<< TIMESPEC_TO_NANOS(std::get<0>(total_client[i])) << ",";
+      // std::cout << TIMESPEC_TO_NANOS(std::get<1>(total_client[i])) << "," << std::get<3>(total_client[i]) << ",";
+      // std::cout << TIMESPEC_TO_NANOS(std::get<1>(total_client[i])) - TIMESPEC_TO_NANOS(std::get<0>(total_client[i])) << "\n";
+    
+      f << std::get<2>(total_client[i]) << ","<< TIMESPEC_TO_NANOS(std::get<0>(total_client[i])) << ",";
+      f << TIMESPEC_TO_NANOS(std::get<1>(total_client[i])) << "," << std::get<3>(total_client[i]) << ",";
+      f << TIMESPEC_TO_NANOS(std::get<1>(total_client[i])) - TIMESPEC_TO_NANOS(std::get<0>(total_client[i])) << "\n";
     }
   }
 
@@ -679,6 +698,20 @@ InferenceProfiler::MeasurementTimestamp(
   for (auto& timestamp : timestamps) {
     uint64_t request_start_time = TIMESPEC_TO_NANOS(std::get<0>(timestamp));
     uint64_t request_end_time = TIMESPEC_TO_NANOS(std::get<1>(timestamp));
+
+    total_client.push_back(timestamp);
+
+    // debug(request_start_time)
+    // debug(request_end_time)
+    // uint64_t dis = request_end_time - request_start_time;
+    // debug(dis)
+    if(request_end_time - request_start_time > max_time_delay_ns){
+      bad_request += 1;
+    }
+    sum_request += 1;
+    // debug(bad_request)
+    // debug(sum_request)
+
     if ((first_request_start_ns > request_start_time) ||
         (first_request_start_ns == 0)) {
       first_request_start_ns = request_start_time;
@@ -688,6 +721,9 @@ InferenceProfiler::MeasurementTimestamp(
       last_request_end_ns = request_end_time;
     }
   }
+
+  if(bad_request * 1.0  > bad_reuqest_rate * sum_request) change_server = true;
+  
 
   // Define the measurement window [client_start_ns, client_end_ns) to be
   // in the middle of the queue

@@ -39,6 +39,12 @@
 namespace triton { namespace perfanalyzer {
 
 volatile bool early_exit = false;
+volatile bool change_server = false;
+volatile uint64_t max_time_delay_ns;
+volatile uint64_t sum_request;
+volatile uint64_t bad_request;
+volatile double bad_reuqest_rate = 0.01;
+volatile int filenameId = 0;
 
 void
 SignalHandler(int signum)
@@ -239,6 +245,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t--latency-threshold (-l) <latency threshold (in msec)>"
             << std::endl;
   std::cerr << "\t--max-threads <thread counts>" << std::endl;
+  std::cerr << "\t--max-delay-threshold <max-time-delay>" << std::endl;
   std::cerr << "\t--stability-percentage (-s) <deviation threshold for stable "
                "measurement (in percentage)>"
             << std::endl;
@@ -725,8 +732,7 @@ solve(
     const std::string DEFAULT_MEMORY_TYPE, std::string triton_server_path,
     std::string model_repository_path, std::string memory_type)
 {
-
-
+  pa::filenameId += 1;
   if (!url_specified && (protocol == cb::ProtocolType::GRPC)) {
     if (kind == cb::BackendKind::TRITON) {
       url = "localhost:8001";
@@ -1212,6 +1218,7 @@ solve(
       }
     }
   }
+  // debug("return 0")
   return 0;
 }
 
@@ -1232,7 +1239,7 @@ main(int argc, char** argv)
   uint64_t concurrency_range[3] = {1, 1, 1};
   double request_rate_range[3] = {1.0, 1.0, 1.0};
   double stability_threshold = 0.1;
-  uint64_t measurement_window_ms = 5000;
+  uint64_t measurement_window_ms = 1050;
   size_t max_trials = 10;
   std::string model_name;
   std::string model_version;
@@ -1278,6 +1285,9 @@ main(int argc, char** argv)
   std::string model_repository_path;
   std::string memory_type = DEFAULT_MEMORY_TYPE;  // currently not used
 
+  pa::max_time_delay_ns = 10000000000;
+  pa::filenameId = 0;
+
   // {name, has_arg, *flag, val}
   static struct option long_options[] = {
       {"streaming", 0, 0, 0},
@@ -1310,6 +1320,7 @@ main(int argc, char** argv)
       {"measurement-request-count", 1, 0, 27},
       {"triton-server-directory", 1, 0, 28},
       {"model-repository", 1, 0, 29},
+      {"max-delay-threshold", 1, 0, 30},
       {0, 0, 0, 0}};
 
   // Parse commandline...
@@ -1574,6 +1585,19 @@ main(int argc, char** argv)
         model_repository_path = optarg;
         break;
       }
+      case 30: {
+        std::string arg = optarg;
+        try {
+          pa::max_time_delay_ns = std::stod(arg);
+          std::cout << "maxs_time_delay:" << pa::max_time_delay_ns << std::endl;
+        }
+        catch (const std::invalid_argument& ia) {
+          Usage(
+              argv, "failed to parse max time delay threshold: " +
+                        std::string(optarg));
+        }
+        break;
+      }
       case 'v':
         extra_verbose = verbose;
         verbose = true;
@@ -1753,6 +1777,9 @@ main(int argc, char** argv)
         "The end of the range can not be less than start of the range for "
         "binary search mode.");
   }
+  std::cout << "Hello World" << std::endl;
+  std::cout << pa::early_exit << std::endl;
+  pa::early_exit = false;
   if (solve(
           kind, verbose, extra_verbose, streaming, max_threads, sequence_length,
           percentile, latency_threshold_ms, batch_size, using_batch_size,
@@ -1771,22 +1798,36 @@ main(int argc, char** argv)
     return 1;
   }
   url = "localhost:8004";
-  if (solve(
-          kind, verbose, extra_verbose, streaming, max_threads, sequence_length,
-          percentile, latency_threshold_ms, batch_size, using_batch_size,
-          stability_threshold, measurement_window_ms, max_trials, model_name,
-          model_version, model_signature_name, url, filename, measurement_mode,
-          measurement_request_count, protocol, http_headers,
-          compression_algorithm, shared_memory_type, output_shm_size,
-          input_shapes, string_length, string_data, user_data, zero_input,
-          concurrent_request_count, max_concurrency, num_of_sequences,
-          dynamic_concurrency_mode, async, forced_sync, using_concurrency_range,
-          using_request_rate_range, using_custom_intervals,
-          using_grpc_compression, search_mode, request_distribution,
-          request_intervals_file, using_old_options, url_specified,
-          max_threads_specified, DEFAULT_MEMORY_TYPE, triton_server_path,
-          model_repository_path, memory_type)) {
-    return 1;
+  // debug(url)
+  // std::cout << url << std::endl;
+  // std::cout << pa::early_exit << std::endl;
+  // std::cout << pa::sum_request << std::endl;
+  // std::cout << pa::bad_request << std::endl;
+  pa::early_exit = false;
+  // std::this_thread::sleep_for(std::chrono::seconds(2));
+  if (pa::change_server) {
+    pa::change_server = false;
+    pa::sum_request = 0;
+    pa::bad_request = 0;
+    url = "localhost:8004";
+    std::cout << "Change to another server" << std::endl;
+    if (solve(
+            kind, verbose, extra_verbose, streaming, max_threads,
+            sequence_length, percentile, latency_threshold_ms, batch_size,
+            using_batch_size, stability_threshold, measurement_window_ms,
+            max_trials, model_name, model_version, model_signature_name, url,
+            filename, measurement_mode, measurement_request_count, protocol,
+            http_headers, compression_algorithm, shared_memory_type,
+            output_shm_size, input_shapes, string_length, string_data,
+            user_data, zero_input, concurrent_request_count, max_concurrency,
+            num_of_sequences, dynamic_concurrency_mode, async, forced_sync,
+            using_concurrency_range, using_request_rate_range,
+            using_custom_intervals, using_grpc_compression, search_mode,
+            request_distribution, request_intervals_file, using_old_options,
+            url_specified, max_threads_specified, DEFAULT_MEMORY_TYPE,
+            triton_server_path, model_repository_path, memory_type)) {
+      return 1;
+    }
   }
   return 0;
 }
