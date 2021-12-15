@@ -45,6 +45,7 @@ volatile uint64_t sum_request;
 volatile uint64_t bad_request;
 volatile double bad_reuqest_rate = 0.01;
 volatile int filenameId = 0;
+volatile uint64_t switch_time_ns = 1000000000;
 
 void
 SignalHandler(int signum)
@@ -246,6 +247,7 @@ Usage(char** argv, const std::string& msg = std::string())
             << std::endl;
   std::cerr << "\t--max-threads <thread counts>" << std::endl;
   std::cerr << "\t--max-delay-threshold <max-time-delay>" << std::endl;
+  std::cerr << "\t--switch-time <switch-time-ns>" << std::endl;
   std::cerr << "\t--stability-percentage (-s) <deviation threshold for stable "
                "measurement (in percentage)>"
             << std::endl;
@@ -1236,8 +1238,6 @@ main(int argc, char** argv)
   uint64_t latency_threshold_ms = pa::NO_LIMIT;
   int32_t batch_size = 1;
   bool using_batch_size = false;
-  uint64_t concurrency_range[3] = {1, 1, 1};
-  double request_rate_range[3] = {1.0, 1.0, 1.0};
   double stability_threshold = 0.1;
   uint64_t measurement_window_ms = 1050;
   size_t max_trials = 10;
@@ -1287,6 +1287,7 @@ main(int argc, char** argv)
 
   pa::max_time_delay_ns = 10000000000;
   pa::filenameId = 0;
+  pa::switch_time_ns = 1000000000;
 
   // {name, has_arg, *flag, val}
   static struct option long_options[] = {
@@ -1321,6 +1322,7 @@ main(int argc, char** argv)
       {"triton-server-directory", 1, 0, 28},
       {"model-repository", 1, 0, 29},
       {"max-delay-threshold", 1, 0, 30},
+      {"switch-time", 1, 0, 31},
       {0, 0, 0, 0}};
 
   // Parse commandline...
@@ -1596,6 +1598,20 @@ main(int argc, char** argv)
               argv, "failed to parse max time delay threshold: " +
                         std::string(optarg));
         }
+        break;
+      }
+      case 31: {
+        std::string arg = optarg;
+        try {
+          pa::switch_time_ns = std::stod(arg);
+          std::cout << "switch_time_ns:" << pa::switch_time_ns << std::endl;
+        }
+        catch (const std::invalid_argument& ia) {
+          Usage(
+              argv, "failed to parse switch time : " +
+                        std::string(optarg));
+        }
+        debug(pa::switch_time_ns)
         break;
       }
       case 'v':

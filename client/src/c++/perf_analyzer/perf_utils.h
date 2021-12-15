@@ -68,6 +68,7 @@ extern volatile uint64_t bad_request;
 //违规率
 extern volatile double bad_reuqest_rate;
 extern volatile int filenameId;
+extern volatile uint64_t switch_time_ns;
 
 #define debug(x) std::cout<<#x<<" = "<<x<<std::endl;
 
