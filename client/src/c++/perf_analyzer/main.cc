@@ -248,6 +248,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t--max-threads <thread counts>" << std::endl;
   std::cerr << "\t--max-delay-threshold <max-time-delay>" << std::endl;
   std::cerr << "\t--switch-time <switch-time-ns>" << std::endl;
+  std::cerr << "\t--change-server-url <change-server-url>" << std::endl;
   std::cerr << "\t--stability-percentage (-s) <deviation threshold for stable "
                "measurement (in percentage)>"
             << std::endl;
@@ -1245,6 +1246,7 @@ main(int argc, char** argv)
   std::string model_version;
   std::string model_signature_name("serving_default");
   std::string url("localhost:8000");
+  std::string change_server_url("localhost:8004");
   std::string filename("");
   pa::MeasurementMode measurement_mode = pa::MeasurementMode::TIME_WINDOWS;
   uint64_t measurement_request_count = 50;
@@ -1323,6 +1325,7 @@ main(int argc, char** argv)
       {"model-repository", 1, 0, 29},
       {"max-delay-threshold", 1, 0, 30},
       {"switch-time", 1, 0, 31},
+      {"change-server-url", 1, 0, 32}, 
       {0, 0, 0, 0}};
 
   // Parse commandline...
@@ -1614,6 +1617,11 @@ main(int argc, char** argv)
         debug(pa::switch_time_ns)
         break;
       }
+      case 32:{
+        change_server_url = optarg;
+        debug(change_server_url)
+        break; 
+      }
       case 'v':
         extra_verbose = verbose;
         verbose = true;
@@ -1813,25 +1821,17 @@ main(int argc, char** argv)
           model_repository_path, memory_type)) {
     return 1;
   }
-  url = "localhost:8004";
-  // debug(url)
-  // std::cout << url << std::endl;
-  // std::cout << pa::early_exit << std::endl;
-  // std::cout << pa::sum_request << std::endl;
-  // std::cout << pa::bad_request << std::endl;
   pa::early_exit = false;
-  // std::this_thread::sleep_for(std::chrono::seconds(2));
   if (pa::change_server) {
     pa::change_server = false;
     pa::sum_request = 0;
     pa::bad_request = 0;
-    url = "localhost:8004";
     std::cout << "Change to another server" << std::endl;
     if (solve(
             kind, verbose, extra_verbose, streaming, max_threads,
             sequence_length, percentile, latency_threshold_ms, batch_size,
             using_batch_size, stability_threshold, measurement_window_ms,
-            max_trials, model_name, model_version, model_signature_name, url,
+            max_trials, model_name, model_version, model_signature_name, change_server_url,
             filename, measurement_mode, measurement_request_count, protocol,
             http_headers, compression_algorithm, shared_memory_type,
             output_shm_size, input_shapes, string_length, string_data,
