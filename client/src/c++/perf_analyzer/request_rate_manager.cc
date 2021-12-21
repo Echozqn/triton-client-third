@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "request_rate_manager.h"
+#include "perf_utils.h"
 
 namespace triton { namespace perfanalyzer {
 
@@ -173,6 +174,12 @@ RequestRateManager::ResumeWorkers()
 
   // Update the start_time_ to point to current time
   start_time_ = std::chrono::steady_clock::now();
+
+  // struct timespec cur_time;
+  // clock_gettime(CLOCK_MONOTONIC, &cur_time);
+  // uint64_t cur_time_ns = TIMESPEC_TO_NANOS(cur_time);
+  // debug("ResumeWorkers")
+  // debug(cur_time_ns - start_time_ns)
 
   // Wake up all the threads to begin execution
   execute_ = true;

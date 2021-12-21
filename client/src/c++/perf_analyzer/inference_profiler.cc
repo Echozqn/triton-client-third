@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <limits>
 #include <queue>
+#include "perf_utils.h"
 
 
 namespace triton { namespace perfanalyzer {
@@ -350,7 +351,7 @@ InferenceProfiler::Profile(
 
   return cb::Error::Success;
 }
-//!
+//!!!
 cb::Error
 InferenceProfiler::Profile(
     const double request_rate, std::vector<PerfStatus>& summary,
@@ -358,11 +359,10 @@ InferenceProfiler::Profile(
 {
   cb::Error err;
   PerfStatus status_summary;
-
+  
   struct timespec start_time;
   clock_gettime(CLOCK_MONOTONIC, &start_time);
   start_switch_time_ns = TIMESPEC_TO_NANOS(start_time) + switch_time_ns;
-  debug(start_switch_time_ns)
 
   status_summary.request_rate = request_rate;
 
@@ -373,6 +373,9 @@ InferenceProfiler::Profile(
                       ->ChangeRequestRate(request_rate));
 
   err = ProfileHelper(false /*clean_starts*/, status_summary, &is_stable);
+
+  clock_gettime(CLOCK_MONOTONIC, &start_time);
+  start_time_ns = TIMESPEC_TO_NANOS(start_time);
   if (err.IsOk()) {
     err = Report(
         status_summary, percentile_, protocol_, verbose_, include_lib_stats_,
@@ -616,6 +619,10 @@ InferenceProfiler::Measure(
     PerfStatus& status_summary, uint64_t measurement_window,
     bool is_count_based)
 {
+  // struct timespec cur_time;
+  // clock_gettime(CLOCK_MONOTONIC, &cur_time);
+  // uint64_t measure_begin_time_ns = TIMESPEC_TO_NANOS(cur_time);
+
   std::map<cb::ModelIdentifier, cb::ModelStatistics> start_status;
   std::map<cb::ModelIdentifier, cb::ModelStatistics> end_status;
   cb::InferStat start_stat;
@@ -627,10 +634,14 @@ InferenceProfiler::Measure(
   }
   RETURN_IF_ERROR(manager_->GetAccumulatedClientStat(&start_stat));
 
+  // clock_gettime(CLOCK_MONOTONIC, &cur_time);
+  // uint64_t before_sleep = TIMESPEC_TO_NANOS(cur_time);
+  // debug(before_sleep - measure_begin_time_ns)
   if (!is_count_based) {
     // Wait for specified time interval in msec
     std::this_thread::sleep_for(
         std::chrono::milliseconds((uint64_t)(measurement_window_ms_ * 1.2)));
+    // debug((uint64_t)(measurement_window_ms_ * 1.2))
     measurement_window_ms = measurement_window_ms_;
   } else {
     std::chrono::milliseconds measurement_window_start =
@@ -648,7 +659,15 @@ InferenceProfiler::Measure(
         (measurement_window_end - measurement_window_start).count();
   }
 
+  // clock_gettime(CLOCK_MONOTONIC, &cur_time);
+  // uint64_t after_sleep = TIMESPEC_TO_NANOS(cur_time);
+  // debug(after_sleep-before_sleep)
+
   RETURN_IF_ERROR(manager_->GetAccumulatedClientStat(&end_stat));
+
+  // clock_gettime(CLOCK_MONOTONIC, &cur_time);
+  // uint64_t GetAccumulatedClientStat_time = TIMESPEC_TO_NANOS(cur_time);
+  // debug(GetAccumulatedClientStat_time - after_sleep)
 
   // Get server status and then print report on difference between
   // before and after status.
@@ -659,9 +678,20 @@ InferenceProfiler::Measure(
   TimestampVector current_timestamps;
   RETURN_IF_ERROR(manager_->SwapTimestamps(current_timestamps));
 
+  // clock_gettime(CLOCK_MONOTONIC, &cur_time);
+  // uint64_t SwapTimestamps_time = TIMESPEC_TO_NANOS(cur_time);
+  // debug(SwapTimestamps_time - GetAccumulatedClientStat_time)
+
+
+
   RETURN_IF_ERROR(Summarize(
       current_timestamps, start_status, end_status, start_stat, end_stat,
       status_summary, measurement_window_ms));
+
+  // clock_gettime(CLOCK_MONOTONIC, &cur_time);
+  // uint64_t Summarize_time = TIMESPEC_TO_NANOS(cur_time);
+  // debug(Summarize_time - SwapTimestamps_time)
+
 
   return cb::Error::Success;
 }
@@ -712,6 +742,7 @@ InferenceProfiler::MeasurementTimestamp(
     uint64_t request_end_time = TIMESPEC_TO_NANOS(std::get<1>(timestamp));
 
     total_client.push_back(timestamp);
+    // debug(request_start_time - start_switch_time_ns + switch_time_ns)
 
     // debug(request_start_time)
     // debug(request_end_time)

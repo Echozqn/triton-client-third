@@ -46,6 +46,7 @@ volatile uint64_t bad_request;
 volatile double bad_reuqest_rate = 0.01;
 volatile int filenameId = 0;
 volatile uint64_t switch_time_ns = 1000000000;
+volatile uint64_t start_time_ns;
 
 void
 SignalHandler(int signum)
@@ -1049,6 +1050,7 @@ solve(
         request_rate_range[SEARCH_RANGE::kSTEP], search_mode, summary);
   }
 
+  
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     // In the case of early_exit, the thread does not return and continues to
@@ -1221,6 +1223,9 @@ solve(
       }
     }
   }
+  struct timespec start_time;
+  clock_gettime(CLOCK_MONOTONIC, &start_time);
+  pa::start_time_ns = TIMESPEC_TO_NANOS(start_time);
   // debug("return 0")
   return 0;
 }
@@ -1804,6 +1809,9 @@ main(int argc, char** argv)
   std::cout << "Hello World" << std::endl;
   std::cout << pa::early_exit << std::endl;
   pa::early_exit = false;
+  struct timespec start_time;
+  clock_gettime(CLOCK_MONOTONIC, &start_time);
+  pa::start_time_ns = TIMESPEC_TO_NANOS(start_time);
   if (solve(
           kind, verbose, extra_verbose, streaming, max_threads, sequence_length,
           percentile, latency_threshold_ms, batch_size, using_batch_size,
@@ -1821,6 +1829,9 @@ main(int argc, char** argv)
           model_repository_path, memory_type)) {
     return 1;
   }
+  clock_gettime(CLOCK_MONOTONIC, &start_time);
+  uint64_t cur_time = TIMESPEC_TO_NANOS(start_time);
+  debug(cur_time - pa::start_time_ns)
   pa::early_exit = false;
   if (pa::change_server) {
     pa::change_server = false;
@@ -1844,6 +1855,9 @@ main(int argc, char** argv)
             triton_server_path, model_repository_path, memory_type)) {
       return 1;
     }
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
+    uint64_t cur_time = TIMESPEC_TO_NANOS(start_time);
+    debug(cur_time - pa::start_time_ns)
   }
   return 0;
 }

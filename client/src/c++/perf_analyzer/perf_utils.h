@@ -69,8 +69,10 @@ extern volatile uint64_t bad_request;
 extern volatile double bad_reuqest_rate;
 extern volatile int filenameId;
 extern volatile uint64_t switch_time_ns;
+extern volatile uint64_t start_time_ns;
 
 #define debug(x) std::cout<<#x<<" = "<<x<<std::endl;
+
 
 
 enum Distribution { POISSON = 0, CONSTANT = 1, CUSTOM = 2 };
