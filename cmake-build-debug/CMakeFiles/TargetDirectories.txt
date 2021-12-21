@@ -1,0 +1,3 @@
+/Users/echozhou/Desktop/triton-client-third/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Users/echozhou/Desktop/triton-client-third/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/echozhou/Desktop/triton-client-third/cmake-build-debug/CMakeFiles/triton_client_third.dir

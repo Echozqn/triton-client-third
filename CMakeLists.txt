@@ -1,0 +1,99 @@
+cmake_minimum_required(VERSION 3.20)
+project(triton_client_third)
+
+set(CMAKE_CXX_STANDARD 14)
+
+include_directories(client/src/c++/library)
+include_directories(client/src/c++/perf_analyzer)
+include_directories(client/src/c++/perf_analyzer/client_backend)
+include_directories(client/src/c++/perf_analyzer/client_backend/tensorflow_serving)
+include_directories(client/src/c++/perf_analyzer/client_backend/torchserve)
+include_directories(client/src/c++/perf_analyzer/client_backend/triton)
+include_directories(client/src/c++/perf_analyzer/client_backend/triton_c_api)
+include_directories(client/src/python/library/tritonclient/utils/cuda_shared_memory)
+include_directories(client/src/python/library/tritonclient/utils/shared_memory)
+
+add_executable(triton_client_third
+        client/src/c++/examples/ensemble_image_client.cc
+        client/src/c++/examples/image_client.cc
+        client/src/c++/examples/reuse_infer_objects_client.cc
+        client/src/c++/examples/simple_grpc_async_infer_client.cc
+        client/src/c++/examples/simple_grpc_cudashm_client.cc
+        client/src/c++/examples/simple_grpc_custom_repeat.cc
+        client/src/c++/examples/simple_grpc_health_metadata.cc
+        client/src/c++/examples/simple_grpc_infer_client.cc
+        client/src/c++/examples/simple_grpc_model_control.cc
+        client/src/c++/examples/simple_grpc_sequence_stream_infer_client.cc
+        client/src/c++/examples/simple_grpc_sequence_sync_infer_client.cc
+        client/src/c++/examples/simple_grpc_shm_client.cc
+        client/src/c++/examples/simple_grpc_string_infer_client.cc
+        client/src/c++/examples/simple_http_async_infer_client.cc
+        client/src/c++/examples/simple_http_cudashm_client.cc
+        client/src/c++/examples/simple_http_health_metadata.cc
+        client/src/c++/examples/simple_http_infer_client.cc
+        client/src/c++/examples/simple_http_model_control.cc
+        client/src/c++/examples/simple_http_sequence_sync_infer_client.cc
+        client/src/c++/examples/simple_http_shm_client.cc
+        client/src/c++/examples/simple_http_string_infer_client.cc
+        client/src/c++/library/cencode.c
+        client/src/c++/library/cencode.h
+        client/src/c++/library/common.cc
+        client/src/c++/library/common.h
+        client/src/c++/library/grpc_client.cc
+        client/src/c++/library/grpc_client.h
+        client/src/c++/library/http_client.cc
+        client/src/c++/library/http_client.h
+        client/src/c++/library/ipc.h
+        client/src/c++/library/json_utils.cc
+        client/src/c++/library/json_utils.h
+        client/src/c++/library/shm_utils.cc
+        client/src/c++/library/shm_utils.h
+        client/src/c++/perf_analyzer/client_backend/tensorflow_serving/tfserve_client_backend.cc
+        client/src/c++/perf_analyzer/client_backend/tensorflow_serving/tfserve_client_backend.h
+        client/src/c++/perf_analyzer/client_backend/tensorflow_serving/tfserve_grpc_client.cc
+        client/src/c++/perf_analyzer/client_backend/tensorflow_serving/tfserve_grpc_client.h
+        client/src/c++/perf_analyzer/client_backend/tensorflow_serving/tfserve_infer_input.cc
+        client/src/c++/perf_analyzer/client_backend/tensorflow_serving/tfserve_infer_input.h
+        client/src/c++/perf_analyzer/client_backend/torchserve/torchserve_client_backend.cc
+        client/src/c++/perf_analyzer/client_backend/torchserve/torchserve_client_backend.h
+        client/src/c++/perf_analyzer/client_backend/torchserve/torchserve_http_client.cc
+        client/src/c++/perf_analyzer/client_backend/torchserve/torchserve_http_client.h
+        client/src/c++/perf_analyzer/client_backend/torchserve/torchserve_infer_input.cc
+        client/src/c++/perf_analyzer/client_backend/torchserve/torchserve_infer_input.h
+        client/src/c++/perf_analyzer/client_backend/triton/triton_client_backend.cc
+        client/src/c++/perf_analyzer/client_backend/triton/triton_client_backend.h
+        client/src/c++/perf_analyzer/client_backend/triton_c_api/c_api_infer_results.h
+        client/src/c++/perf_analyzer/client_backend/triton_c_api/shared_library.cc
+        client/src/c++/perf_analyzer/client_backend/triton_c_api/shared_library.h
+        client/src/c++/perf_analyzer/client_backend/triton_c_api/triton_c_api_backend.cc
+        client/src/c++/perf_analyzer/client_backend/triton_c_api/triton_c_api_backend.h
+        client/src/c++/perf_analyzer/client_backend/triton_c_api/triton_loader.cc
+        client/src/c++/perf_analyzer/client_backend/triton_c_api/triton_loader.h
+        client/src/c++/perf_analyzer/client_backend/client_backend.cc
+        client/src/c++/perf_analyzer/client_backend/client_backend.h
+        client/src/c++/perf_analyzer/concurrency_manager.cc
+        client/src/c++/perf_analyzer/concurrency_manager.h
+        client/src/c++/perf_analyzer/custom_load_manager.cc
+        client/src/c++/perf_analyzer/custom_load_manager.h
+        client/src/c++/perf_analyzer/data_loader.cc
+        client/src/c++/perf_analyzer/data_loader.h
+        client/src/c++/perf_analyzer/inference_profiler.cc
+        client/src/c++/perf_analyzer/inference_profiler.h
+        client/src/c++/perf_analyzer/load_manager.cc
+        client/src/c++/perf_analyzer/load_manager.h
+        client/src/c++/perf_analyzer/main.cc
+        client/src/c++/perf_analyzer/model_parser.cc
+        client/src/c++/perf_analyzer/model_parser.h
+        client/src/c++/perf_analyzer/perf_utils.cc
+        client/src/c++/perf_analyzer/perf_utils.h
+        client/src/c++/perf_analyzer/request_rate_manager.cc
+        client/src/c++/perf_analyzer/request_rate_manager.h
+        client/src/c++/tests/client_timeout_test.cc
+        client/src/c++/tests/memory_leak_test.cc
+        client/src/python/library/tritonclient/utils/cuda_shared_memory/cencode.c
+        client/src/python/library/tritonclient/utils/cuda_shared_memory/cencode.h
+        client/src/python/library/tritonclient/utils/cuda_shared_memory/cuda_shared_memory.cc
+        client/src/python/library/tritonclient/utils/cuda_shared_memory/cuda_shared_memory.h
+        client/src/python/library/tritonclient/utils/shared_memory/shared_memory.cc
+        client/src/python/library/tritonclient/utils/shared_memory/shared_memory.h
+        client/src/python/library/tritonclient/utils/shared_memory/shared_memory_handle.h)
